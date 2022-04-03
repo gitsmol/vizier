@@ -18,10 +18,21 @@ class Anaglyph():
     """
     Class to create anaglyph images. Each anaglyph consists of two instances of this class, i.e. Left() and Right().
     draw() creates the anaglyph background according to the kwargs defined in __init__.
+
+
+    :param label: Give a unique label to this part of the anaglyph. Used to tag draw_nodes.
+    :param bg_offset: Define drawing offset on x-axis for the background image.
+    :param focal_offset: Define drawing offset on x-axis for the focal image.
+    :param size: Size of one side of the image in pixels. Used for x and y size.
+    :param pixel_size: Size of the individual squares ('pixels') drawn.
+    :param focal_size: Size of the focal point.
+    :param rng: Random state used by the RNG for the background image.
+    :param rng_focal: Random state used by the RNG for the focal image.
     """
+
     def __init__(self, **kwargs):
         self.label = kwargs.get('label', 'no_label')
-        self.offset_x = kwargs.get('offset_x', 0)
+        self.bg_offset = kwargs.get('bg_offset', 0)
         self.focal_offset = kwargs.get('focal_offset', 0)
         self.size = kwargs.get('size', 500)
         self.pixel_size = kwargs.get('pixel_size', 10)
@@ -31,68 +42,56 @@ class Anaglyph():
         self.color = kwargs.get('color', COLORS['white'])
         self.rng = np.random.RandomState(kwargs.get('random_state', 0))
         self.rng_focal = np.random.RandomState(kwargs.get('random_state', 1))
-        self.pixel_array = self.rng.choice([0, 1, 2], size=(self.pixel_count, self.pixel_count))
+        self.pixel_array = self.rng.choice([0, 1], size=(self.pixel_count, self.pixel_count))
+        self.mask_array = np.zeros((self.pixel_count, self.pixel_count), dtype=int)
         self.focal_pixel_rng = self.rng_focal.choice([0, 1], size=(self.pixel_count, self.pixel_count))
 
-    def add_focal(self):
-        debugger(f'calling add_focal()')
-
+    def draw_focal(self):
+        """Draws a diamond shaped focal point. Removes the datapoints for the focal point from
+        the pixel_array used for the background. This creates the illusion of the focal point
+        obscuring its background."""
         focal_array = np.zeros((self.focal_size, self.focal_size), dtype=int)
         focal_loc = {
-            'top': {'x': 0.5, 'y': 0.15 }
+            'top': {'x': 0.5, 'y': 0.25 },
+            'bottom': {'x': 0.5, 'y': 0.75 },
+            'left': {'x': 0.25, 'y': 0.5 },
+            'right': {'x': 0.75, 'y': 0.5 }
         }
-        position = 'top'
-        x_min = int(self.size * focal_loc[position]['x']) - int(self.size / 2) + self.focal_offset
-        y_min = int(self.size * focal_loc[position]['y']) - int(self.size / 2)
-
-        debugger(f'focal_array shape:\n{focal_array.shape}')
+        position = 'left'
+        x_min = int(self.pixel_count * focal_loc[position]['x']) - int(self.focal_pixel_count)
+        y_min = int(self.pixel_count * focal_loc[position]['y']) - int(self.focal_pixel_count)
 
         diamond_builder = []
         step = round(self.focal_size / (self.focal_size/2))
         [diamond_builder.append(i) for i in range(0, self.focal_size, step)]
         diamond_builder.extend(list(diamond_builder[::-1]))
 
-        for y, pixels in enumerate(diamond_builder):
-            center = round(self.focal_size / 2)
-            y +- y_min
-            x = int(center - pixels /2) + x_min
-            for x in range(x, x+pixels):
-                # focal_array[y, x] = self.focal_pixel_rng[y, x]
-                self.pixel_array[y, x] = self.focal_pixel_rng[y, x]
+        with dpg.draw_node(tag=f'{self.label}_focal'):
+            for y, pixels in enumerate(diamond_builder):
+                center = round(self.focal_size / 2)
+                y += y_min
+                x = int(center - pixels / 2) + x_min
+                for x in range(x, x+pixels):
+                    self.mask_array[x, y] = 1
+                    if self.focal_pixel_rng[x, y] == 1:
+                        draw_x = (x + self.focal_offset) * self.pixel_size
+                        draw_y = y * self.pixel_size
+                        dpg.draw_rectangle((draw_x, draw_y), (draw_x+self.pixel_size, draw_y+self.pixel_size), fill=self.color, color=self.color)
 
-    def draw(self):
+        self.pixel_array = self.pixel_array - self.mask_array
+
+    def draw_bg(self):
+        """Draws the background from a randomly generated self.pixel_array. Draw_focal needs to be called beforehand
+        so the pixels in the focal point are removed from the background array."""
         debugger(f'pixel_array shape:\n{self.pixel_array.shape}')
-        self.add_focal()
-        with dpg.draw_node(tag=self.label):
-            for i, row_ in enumerate(self.pixel_array):
-                x = (i * self.pixel_size) + self.offset_x
-                for j, rand_value in enumerate(row_):
-                    y = (j * self.pixel_size)
-                    if rand_value == 1:
-                        dpg.draw_rectangle((x, y), (x+self.pixel_size, y+self.pixel_size), fill=self.color, color=self.color)
-
-    def draw_focal(self, parallax_factor=1, mask=False):
-        if mask ==True:
-            node_name = f'{self.label}_focalmask'
-        else:
-            node_name = f'{self.label}_focal'
-        with dpg.draw_node(tag=node_name):
-            parallax_factor = 1
-            focal_pixels_x = self.pixel_count / 8    # relative size of the focal diamond
-            pixels_in_diamond = list(range(0, int(focal_pixels * 2)))   # create a list for
-            pixels_in_diamond.extend(list(squares_in_diamond[::-1]))       # nr of sq per row
-            center_x = round((self.offset_x +             # start at the offset
-                        focal_pixels_x *           # and take max width of diamond
-                        self.pixel_size * 2 *      # multiply by size of pixels * 2
-                        parallax_factor), 0)            # finally factor in parallax
-            for row, pixels in enumerate(squares_in_diamond):  # start new row
-                x = center_x - self.pixel_size * pixels
-                y = self.pixel_size * row
-                for i in range(0, pixels * 2):     # draw all squares in row
-                    x += self.pixel_size
-                    rand_value = self.pixel_array[row, i]
-                    if rand_value == 1:
-                        dpg.draw_rectangle((x, y), (x+self.pixel_size, y+self.pixel_size), fill=self.color, color=self.color)
+        with dpg.draw_layer():
+            with dpg.draw_node(tag=self.label):
+                pixels = (self.pixel_array >0).nonzero()
+                coords = zip(pixels[0], pixels[1])
+                for x, y in coords:
+                    x = (x + self.bg_offset) * self.pixel_size
+                    y = y * self.pixel_size
+                    dpg.draw_rectangle((x, y), (x+self.pixel_size, y+self.pixel_size), fill=self.color, color=self.color)
 
 # class Square():
    # SHOULD REALLY MAKE OBJECTS IN CLASSES TO BE MOVED OR SOMETHING ABSTRACT THIS P1 stuff away...
@@ -164,18 +163,22 @@ def launcher(sender, app_data):
                 **{'label' : 'left',
                     'size': 300,
                     'pixel_size': 2,
+                    'bg_offset' : 0,
+                    'focal_offset' : 0,
                     'color': dpg.get_value('color_left')}
             )
             right_square = Anaglyph(
                 **{'label' : 'right',
                     'size': 300,
-                    'offset_x' : 10,
-                    'focal_offset': 2,
                     'pixel_size': 2,
+                    'bg_offset' : 5,
+                    'focal_offset': 4,
                     'color': dpg.get_value('color_right')}
             )
-            left_square.draw()
-            right_square.draw()
+            left_square.draw_focal()
+            left_square.draw_bg()
+            right_square.draw_focal()
+            right_square.draw_bg()
     if sender == 'btn_alignment':
         dpg.delete_item('excercise_graphics', children_only=True)
         with dpg.drawlist(tag='alignment_test', parent='excercise_graphics', width=200, height=200):
@@ -190,8 +193,11 @@ def launcher(sender, app_data):
                 dpg.add_table_column()
                 dpg.add_table_column()
                 with dpg.table_row():
-                    dpg.add_color_picker(label='Left eye', source='color_left', alpha_bar=True, no_inputs=True)
-                    dpg.add_color_picker(label='Right eye', source='color_right', alpha_bar=True, no_inputs=True)
+                    dpg.add_color_picker(label='Left eye', source='color_left', alpha_bar=True, no_inputs=True, callback=calibrate)
+                    dpg.add_color_picker(label='Right eye', source='color_right', alpha_bar=True, no_inputs=True, callback=calibrate)
+            with dpg.drawlist(tag='draw_calibrate', width=300, height=200):
+                dpg.draw_quad((0, 50), (50, 100), (100, 50), (50, 0), fill=dpg.get_value('color_left'), color=dpg.get_value('color_left'), thickness=0, parent='draw_calibrate')
+                dpg.draw_quad((50, 50), (100, 100), (150, 50), (100, 0), fill=dpg.get_value('color_right'), color=dpg.get_value('color_right'), thickness=0, parent='draw_calibrate')
 
 def calibrate(sender, app_data):
     if sender == 'btn_swap_eyes':
@@ -199,6 +205,10 @@ def calibrate(sender, app_data):
         right = dpg.get_value('color_right')
         dpg.set_value('color_left', right)
         dpg.set_value('color_right', left)
+    dpg.delete_item('draw_calibrate', children_only=True)
+    dpg.draw_quad((0, 50), (50, 100), (100, 50), (50, 0), fill=dpg.get_value('color_left'), color=dpg.get_value('color_left'), thickness=0, parent='draw_calibrate')
+    dpg.draw_quad((50, 50), (100, 100), (150, 50), (100, 0), fill=dpg.get_value('color_right'), color=dpg.get_value('color_right'), thickness=0, parent='draw_calibrate')
+
 
 def translator(sender, app_data):
     if sender == 'parallax_translator':
@@ -240,8 +250,14 @@ with dpg.window(tag="controls", pos=[600,0], width=300, height=300, **fixed_wind
 with dpg.window(tag='debugger', pos=[600, 300], width=300, height=400, **fixed_window):
     dpg.add_text(source='txt_debug', wrap=280)
 
+with dpg.theme() as global_theme:
+    with dpg.theme_component(dpg.mvAll):
+        dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (0, 0, 0), category=dpg.mvThemeCat_Core)
+        dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 1, category=dpg.mvThemeCat_Core)
+dpg.bind_theme(global_theme)
+
 dpg.add_window(tag="excercise_graphics",width=600, height=700, pos=[0, 0], **fixed_window)
-dpg.create_viewport(title='Veni Vidi Vici', width=900, height=700)
+dpg.create_viewport(title='Veni Vidi Vici', width=900, height=900)
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.set_viewport_vsync(True)
