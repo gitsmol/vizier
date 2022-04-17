@@ -1,6 +1,7 @@
 import dearpygui.dearpygui as dpg
 import numpy as np
 import uuid
+from collections import namedtuple
 from . import helpers
 
 """Module providing visual therapy exercises as classes."""
@@ -29,12 +30,10 @@ class Anaglyph():
     :param size: Size of one side of the image in pixels. Used for x and y size.
     :param pixel_size: Size of the individual squares ('pixels') drawn.
     :param focal_size_rel: Relative size of the focal point as fraction of 1.
-    :param rng: Random state used by the RNG for the background image.
-    :param rng_focal: Random state used by the RNG for the focal image.
     """
 
     def __init__(self, **kwargs):
-        self.node_uuid = ''
+        self.node_uuid = uuid.uuid4()
         self.parent = kwargs.get('parent', 'draw_exercise')
         self.bg_offset = kwargs.get('bg_offset', 0)
         self.focal_offset = kwargs.get('focal_offset', 2)
@@ -44,15 +43,12 @@ class Anaglyph():
         self.focal_size = self.size * self.focal_size_rel
         self.pixel_count = int(self.size / self.pixel_size)
         self.focal_pixel_count = int(self.focal_size / self.pixel_size)
-        self.focal_position = np.random.choice(['top', 'bottom', 'left', 'right'])
         self.rng = np.random.default_rng()
-        self.init_pixel_array = self.rng.choice([0, 1], size=(self.pixel_count, self.pixel_count))
-        self.bg_pixel_array = self.init_pixel_array
-        self.mask_array = np.zeros((self.pixel_count, self.pixel_count), dtype=int)
-        self.focal_pixel_rng = self.rng.choice([0, 1], size=(self.pixel_count, self.pixel_count))
-
-    def __del__(self):
-        helpers.debugger(f'destructor called for {self.node_uuid}')
+        self.focal_position = None
+        self.init_pixel_array = None
+        self.bg_pixel_array = None
+        self.mask_array = None
+        self.focal_pixel_rng = None
 
     def draw_focal(self, eye):
         """Draws a diamond shaped focal point. Removes the datapoints for the focal point from
@@ -63,7 +59,6 @@ class Anaglyph():
         To achieve this effect, the focal point is shifted slightly to the center of vision
         relative to the background. The brain interprets this as the object being closer.
         """
-        helpers.debugger(f'drawing {eye} eye')
 
         if eye == 'left':
             color = dpg.get_value('color_left')
@@ -78,8 +73,6 @@ class Anaglyph():
         if eye not in ['left', 'right']:
             raise ValueError("Wrong value given for 'eye'. Accepted values are 'left' and 'right'.")
 
-        helpers.debugger(f'bg_offset: {bg_offset}\nfocal_offset: {focal_offset}')
-
         focal_array = np.zeros((self.focal_pixel_count, self.focal_pixel_count), dtype=int)
         focal_loc = {
             'top': {'x': 0.5, 'y': 0.25 },
@@ -89,18 +82,11 @@ class Anaglyph():
         }
         x_min = int(self.pixel_count * focal_loc[self.focal_position]['x'])
         y_min = int(self.pixel_count * focal_loc[self.focal_position]['y']) - int(self.focal_pixel_count / 2)
-        helpers.debugger(f'x_min: {x_min}, y_min: {y_min}')
-        helpers.debugger(f'pixel count: {self.pixel_count}')
-        helpers.debugger(f'pixel_array shape: {self.bg_pixel_array.shape}')
-        helpers.debugger(f'mask_array shape: {self.mask_array.shape}')
-        helpers.debugger(f'focal pixel count: {self.focal_pixel_count}')
-        helpers.debugger(f'focal_array shape: {focal_array.shape}')
 
         diamond_builder = []
         step = round(self.focal_pixel_count / (self.focal_pixel_count/2))
         [diamond_builder.append(i) for i in range(0, self.focal_pixel_count, step)]
         diamond_builder.extend(list(diamond_builder[::-1]))
-        helpers.debugger(f'diamond_builder: \n{diamond_builder}')
 
         for y, pixels in enumerate(diamond_builder):
             center = round(self.focal_size / 2)     # find middle of array
@@ -119,8 +105,6 @@ class Anaglyph():
     def draw_bg(self, eye):
         """Draws the background from a randomly generated self.bg_pixel_array. Draw_focal needs to be called beforehand
         so the pixels in the focal point are removed from the background array."""
-
-        helpers.debugger(f'pixel_array shape:\n{self.bg_pixel_array.shape}')
 
         if eye == 'left':
             color = dpg.get_value('color_left')
@@ -150,7 +134,14 @@ class Anaglyph():
 
         helpers.debugger(f'drawing {self.node_uuid}')
 
-        self.node_uuid = str(uuid.uuid4()) # need new uuid for every time we draw
+        # initialize random arrays for every draw_node
+        self.node_uuid = str(uuid.uuid4())
+        self.focal_position = np.random.choice(['top', 'bottom', 'left', 'right'])
+        self.rng = np.random.default_rng()
+        self.init_pixel_array = self.rng.choice([0, 1], size=(self.pixel_count, self.pixel_count))
+        self.bg_pixel_array = self.init_pixel_array
+        self.mask_array = np.zeros((self.pixel_count, self.pixel_count), dtype=int)
+        self.focal_pixel_rng = self.rng.choice([0, 1], size=(self.pixel_count, self.pixel_count))
 
         def draw_eye(eye):
             self.draw_focal(eye)
@@ -161,7 +152,17 @@ class Anaglyph():
             draw_eye('left')
             draw_eye('right')
 
-        return self.node_uuid # return the uuid for this node
+        # return a namedtuple for legibility in other places
+        drawing = namedtuple('Drawing', ['node_uuid', 'focal_position'])
+        return drawing(self.node_uuid, self.focal_position)
+
+    def check_answer(self, answer):
+        """Checks the given answer for correctness. In this case: did user indicate the right
+        position of the focal point?"""
+        if answer == self.focal_position:
+            return True
+        else:
+            return False
 
 
 class DepthPerception():
@@ -170,6 +171,8 @@ class DepthPerception():
         self.object_count = ''
 
 class Recognition():
+    """Game where subject sees a number of objects and has to reproduce them
+    through keyboard input as quickly as possible."""
     def __init__(self):
         self.object_shape = ''
         self.object_count = ''
