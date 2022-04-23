@@ -38,6 +38,8 @@ class Anaglyph():
         self.bg_offset = kwargs.get('bg_offset', 0)
         self.focal_offset = kwargs.get('focal_offset', 2)
         self.size = kwargs.get('size', dpg.get_value('anaglyph_size'))
+        self.drawlist_x_center = dpg.get_item_width(self.parent) / 2 - self.size / 2
+        self.drawlist_y_center = dpg.get_item_height(self.parent) / 2 - self.size / 2
         self.pixel_size = kwargs.get('pixel_size', dpg.get_value('anaglyph_pixel_size'))
         self.focal_size_rel = kwargs.get('focal_size_rel', dpg.get_value('anaglyph_focal_size'))
         self.focal_size = self.size * self.focal_size_rel
@@ -96,8 +98,8 @@ class Anaglyph():
             for x in range(x, x+pixels):
                 self.mask_array[x+focal_offset, y] = 1           # draw the diamond in the mask array
                 if self.focal_pixel_rng[x, y] == 1:
-                    draw_x = (x + bg_offset + focal_offset) * self.pixel_size
-                    draw_y = y * self.pixel_size
+                    draw_x = (x + bg_offset + focal_offset) * self.pixel_size + self.drawlist_x_center
+                    draw_y = y * self.pixel_size + self.drawlist_y_center
                     dpg.draw_rectangle((draw_x, draw_y), (draw_x+self.pixel_size, draw_y+self.pixel_size), fill=color, color=color)
 
         self.bg_pixel_array = self.bg_pixel_array - self.mask_array   # cut the mask array out of the bg array
@@ -120,8 +122,8 @@ class Anaglyph():
         pixels = (self.bg_pixel_array > 0).nonzero()
         coords = zip(pixels[0], pixels[1])
         for x, y in coords:
-            x = (x + bg_offset) * self.pixel_size
-            y = y * self.pixel_size
+            x = (x + bg_offset) * self.pixel_size + self.drawlist_x_center
+            y = y * self.pixel_size + self.drawlist_y_center
             dpg.draw_rectangle((x, y), (x+self.pixel_size, y+self.pixel_size), fill=color, color=color)
 
         # cleanup arrays for second pass of drawing
@@ -155,15 +157,6 @@ class Anaglyph():
         # return a namedtuple for legibility in other places
         drawing = namedtuple('Drawing', ['node_uuid', 'focal_position'])
         return drawing(self.node_uuid, self.focal_position)
-
-    def check_answer(self, answer):
-        """Checks the given answer for correctness. In this case: did user indicate the right
-        position of the focal point?"""
-        if answer == self.focal_position:
-            return True
-        else:
-            return False
-
 
 class DepthPerception():
     def __init__(self):

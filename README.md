@@ -26,6 +26,6 @@ The evaluation logic defines how to progress through the evaluation and adjusts 
  - They keyboard arrows are recorded as input for the evaluation.
  - The function runs for 2 minutes or until 50 answers have been given.
  - The answer can be True (success) or False (fail).
- - For every 2 True answers, the primary parameter (in this case bg_offset) is increased by 1. The 'success' parameter is reset.
+ - For every 2 True answers, the primary parameter (in this case bg_offset) is increased by its step (1 by default). The 'success' parameter is reset.
  - For every 2 False answers, the primary parameter is reset to its initial value. The 'fail' parameter is reset.
  
