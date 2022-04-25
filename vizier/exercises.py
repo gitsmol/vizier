@@ -1,6 +1,5 @@
 import dearpygui.dearpygui as dpg
 import numpy as np
-import uuid
 from collections import namedtuple
 from . import helpers
 
@@ -33,13 +32,13 @@ class Anaglyph():
     """
 
     def __init__(self, **kwargs):
-        self.node_uuid = uuid.uuid4()
-        self.parent = kwargs.get('parent', 'draw_exercise')
+        self.node_uuid = dpg.generate_uuid()
+        self.drawlist_uuid = kwargs.get('drawlist_uuid', 'draw_exercise')
         self.bg_offset = kwargs.get('bg_offset', 0)
         self.focal_offset = kwargs.get('focal_offset', 2)
         self.size = kwargs.get('size', dpg.get_value('anaglyph_size'))
-        self.drawlist_x_center = dpg.get_item_width(self.parent) / 2 - self.size / 2
-        self.drawlist_y_center = dpg.get_item_height(self.parent) / 2 - self.size / 2
+        self.drawlist_x_center = dpg.get_item_width(self.drawlist_uuid) / 2 - self.size / 2
+        self.drawlist_y_center = dpg.get_item_height(self.drawlist_uuid) / 2 - self.size / 2
         self.pixel_size = kwargs.get('pixel_size', dpg.get_value('anaglyph_pixel_size'))
         self.focal_size_rel = kwargs.get('focal_size_rel', dpg.get_value('anaglyph_focal_size'))
         self.focal_size = self.size * self.focal_size_rel
@@ -137,7 +136,7 @@ class Anaglyph():
         helpers.debugger(f'drawing {self.node_uuid}')
 
         # initialize random arrays for every draw_node
-        self.node_uuid = str(uuid.uuid4())
+        self.node_uuid = str(dpg.generate_uuid())
         self.focal_position = np.random.choice(['top', 'bottom', 'left', 'right'])
         self.rng = np.random.default_rng()
         self.init_pixel_array = self.rng.choice([0, 1], size=(self.pixel_count, self.pixel_count))
@@ -149,7 +148,7 @@ class Anaglyph():
             self.draw_focal(eye)
             self.draw_bg(eye)
 
-        with dpg.draw_node(tag=self.node_uuid, parent=self.parent):
+        with dpg.draw_node(tag=self.node_uuid, parent=self.drawlist_uuid):
             dpg.hide_item(self.node_uuid)
             draw_eye('left')
             draw_eye('right')
@@ -165,7 +164,51 @@ class DepthPerception():
 
 class Recognition():
     """Game where subject sees a number of objects and has to reproduce them
-    through keyboard input as quickly as possible."""
-    def __init__(self):
-        self.object_shape = ''
-        self.object_count = ''
+    through keyboard input as quickly as possible.
+
+    :param object_type
+    :param object_count
+    :param object_size
+    :param build_time_secs
+    :param display_time_secs
+    :param drawlist_uuid: uuid of the drawlist to draw on
+
+    """
+    def __init__(self, **kwargs):
+        self.object_type = kwargs.get('object_type', 'arrow')
+        self.object_count = kwargs.get('object_count', 3)
+        self.object_rel_size = kwargs.get('object_size', 5)
+        self.build_time_secs = kwargs.get('build_time_secs', 0.4)
+        self.display_time_secs = kwargs.get('delay', 0.7)
+        self.drawlist_uuid = kwargs.get('drawlist_uuid', None)
+        self.drawlist_width = dpg.get_item_width(self.drawlist_uuid)
+        self.object_size = self.object_rel_size / 100 * self.drawlist_width
+        self.rng = np.random.default_rng()
+
+    def draw(self):
+        """Draw sequence of objects in hidden state. Return drawnode uuid."""
+        object_margin = self.object_size * 0.15
+        min_x = (self.drawlist_width / 2) - (self.object_count * (self.object_size + object_margin) / 2)
+        rng = np.random.default_rng()
+        node_uuid = str(dpg.generate_uuid())
+        arrow_direction = rng.choice(['top', 'bottom', 'left', 'right'])
+        arrows = {
+            'Up': 'ArrowUp.png',
+            'Down': 'ArrowDown.png',
+            'Left': 'ArrowLeft.png',
+            'Right': 'ArrowRight.png'
+        }
+        directions = []
+
+        with dpg.draw_node(tag=node_uuid):
+            for i in range(self.object_count):
+                random_direction = self.rng.choice(['Up', 'Down', 'Left', 'Right'])
+                x = min_x + (i * (self.object_size + object_margin))
+                helpers.debugger(x)
+                y = 100
+                dpg.draw_image(arrows.get(random_direction), pmin=(x, y), pmax=(x + self.object_size, y + self.object_size))
+                directions.append(random_direction)
+
+         # return a namedtuple for legibility in other places
+        drawing = namedtuple('Drawing', ['node_uuid', 'directions', 'display_time_secs'])
+        return drawing(node_uuid, directions, self.display_time_secs)

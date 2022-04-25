@@ -1,6 +1,7 @@
 import dearpygui.dearpygui as dpg
 import numpy as np
 from time import time
+from pathlib import Path
 from . import helpers
 from . import exercises
 from . import evaluations
@@ -121,12 +122,13 @@ with dpg.window(tag='primary_window'):
             with dpg.table_row():
                 dpg.add_table_cell()
                 dpg.add_button(tag='btn_anaglyph', label='Anaglyph exercise', callback=evaluations.launcher, width=200)
-            with dpg.table_row():
-                dpg.add_table_cell()
                 dpg.add_button(tag='btn_configure', label='Anaglyph config', callback=menu_launcher, width=200)
             with dpg.table_row():
                 dpg.add_table_cell()
-                dpg.add_button(tag='btn_alignment', label='Alignment exercise', callback=evaluations.launcher, width=200)
+                dpg.add_button(tag='btn_recognition', label='Recognition exercise', callback=evaluations.launcher, width=200)
+            with dpg.table_row():
+                dpg.add_table_cell()
+                dpg.add_button(tag='btn_evaluate', label='Evaluations', callback=evaluations.evaluation_launcher, width=200)
             with dpg.table_row():
                 dpg.add_table_cell()
                 dpg.add_button(tag='btn_calibrate', label='Calibrate', callback=menu_launcher, width=200)
@@ -174,6 +176,17 @@ with dpg.font_registry():
 
 dpg.bind_font(font_default)
 # dpg.bind_font(font_dyslexic)
+
+# set image path to walk through
+# TODO create config file for this.
+image_path = '../vizier/vizier/assets/images/'
+
+# # add all png images in image_path to texture registry
+with dpg.texture_registry(show=False, tag='textures'):
+    for imagefile in helpers.dirwalk(Path(image_path)):
+        if imagefile.suffix == '.png':
+            width, height, channels, data = dpg.load_image(str(imagefile))
+            dpg.add_static_texture(width, height, data, label=str(imagefile.name), tag=str(imagefile.name))
 
 # DPG context etc
 dpg.create_viewport(title='Vizier', width=800, height=700)

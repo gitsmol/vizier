@@ -6,10 +6,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from time import time, time_ns, sleep
 from threading import Thread
+from collections import namedtuple
+from pathlib import Path
+import json
 
 class DrawQueue():
     """Queue, show and delete draw_nodes."""
-
     def __init__(self):
         self.queue = []
         self.current_item = ''
@@ -22,12 +24,21 @@ class DrawQueue():
         """Unhides current node, deletes previous node."""
         queued_item = self.queue.pop(0)
         dpg.show_item(queued_item.node_uuid)
+        if hasattr(queued_item, 'display_time_secs'):
+            debugger(f'Displaying for {queued_item.display_time_secs}')
+            timer = Thread(target=self.display_timer, \
+                           args=(queued_item.node_uuid, queued_item.display_time_secs))
+            timer.start()
         if self.current_item:
             dpg.delete_item(self.current_item.node_uuid)
-        debugger(f'focal_position = {queued_item.focal_position}')
         self.current_item = queued_item
 
-class Evaluation():
+    def display_timer(self, node_uuid, secs):
+        sleep(secs)
+        dpg.hide_item(node_uuid)
+
+
+class EvaluationSession():
     """Stores evaluation context variables, parameters and results.
 
     :param primary_param: the primary exercise parameter.
@@ -37,11 +48,14 @@ class Evaluation():
     :param count: number of iterations of the sequence.
     :param duration_secs: duration of the sequence in seconds.
 
+    :func add_result(tuple): adds a tuple containing an evaluation result to the session results.
     :func end(): stops the evaluation and displays the results.
     """
-    def __init__(self, window_tag, **kwargs):
-
+    def __init__(self, window_tag=None, **kwargs):
         self.window = window_tag
+        self.win_uuid = dpg.generate_uuid()
+        self.handler_uuid = dpg.generate_uuid()
+        self.drawlist_uuid = dpg.generate_uuid()
         self.primary_param_init = kwargs.get('primary_param_init', 0)
         self.primary_param = self.primary_param_init
         self.step = kwargs.get('step', 1)
@@ -54,34 +68,13 @@ class Evaluation():
         self.fail = 0
         self.success = 0
         self.active = True
-        self.timer = Thread(target=self.countdown)
+        self.timer = Thread(target=self._countdown)
         self.timer.start()
+        self.Result = namedtuple('Result', ['count', 'primary_param', 'correctness', 'time', 'time_diff'])
 
     def dataframe(self) -> int:
         df = pd.DataFrame(self.results, columns=['Count', 'Answer', 'Epoch', 'Diff_sec'])
         return df
-
-    def end(self):
-        debugger('Stopping evaluation.')
-        self.active = False
-        dpg.delete_item(self.window)
-        dpg.delete_item(f'{self.window}_handler_registry')
-        # with parent(self.window):
-        with dpg.window(pos=[100, 200], width=400, height=500):
-            dpg.add_text('Finished!')
-            with dpg.table(resizable=False, policy=4, scrollY=False, header_row=False):
-                dpg.add_table_column(width=25, width_stretch=True)
-                dpg.add_table_column(width=25, width_stretch=True)
-                # dpg.add_table_column(width=25, width_stretch=True)
-                dpg.add_table_column(width=25, width_stretch=True)
-                dpg.add_table_column(width=25, width_stretch=True)
-                for i in range(len(self.results)):
-                    with dpg.table_row():
-                        dpg.add_text(self.results[i][0])    # count
-                        dpg.add_text(self.results[i][1])    # primary param
-                        dpg.add_text(self.results[i][2])    # correctness
-                        # dpg.add_text(self.results[i][3])    # time
-                        dpg.add_text(self.results[i][4])    # time diff
 
     def add_result(self, result):
         now = time()
@@ -91,7 +84,8 @@ class Evaluation():
             diff = round(now - prev, 4)
         if count == 1:
             diff = 0
-        self.results.append((count, self.primary_param, result, now, diff))
+        record = self.Result(count, self.primary_param, result, now, diff)
+        self.results.append(record)
 
         if result == True:
             self.success += 1
@@ -109,26 +103,46 @@ class Evaluation():
             self.primary_param = self.primary_param_init
             self.fail = 0
 
-        debugger(f""""Round {len(self.results)}
-        result = {result}
-        succes = {self.success}
-        fail = {self.fail}
-        primary_param = {self.primary_param}
-        -----
-        """)
-
-        if len(self.results) >= self.count:
+        if (len(self.results) >= self.count) & (self.active):
             self.end()
 
-    def countdown(self):
+    def _countdown(self):
         """"Counts down time remaining in the evaluation session."""
         time_end = time() + self.duration_secs
-        while time() < time_end:
+        while (time() < time_end) & (self.active):
             time_remaining = round(time_end - time())
             dpg.set_value('str_time_remaining', time_remaining)
+            debugger(f'Countdown: {time_remaining}')
             sleep(1)
         dpg.set_value('str_time_remaining', 'All done.')
-        self.end()
+        debugger(f'Countdown stopped.')
+        if self.active:
+            self.end()
+
+    def end(self):
+        """Ends the evaluation session. Destroys IO handler and window. Stops _countdown thread. Creates results window."""
+        debugger('Stopping evaluation.')
+        self.active = False
+        dpg.delete_item(self.handler_uuid)
+        dpg.delete_item(self.win_uuid)
+        self.show_results()
+
+    def show_results(self):
+        with dpg.window(pos=[100, 200], width=400, height=500):
+            dpg.add_text('Finished!')
+            with dpg.table(resizable=False, policy=4, scrollY=False, header_row=True):
+                for item in self.results[0]:
+                    dpg.add_table_column(width=25, width_stretch=True, label='Label')
+                    # dpg.add_table_column(width=25, width_stretch=True)
+                # dpg.add_table_column(width=25, width_stretch=True)
+                # dpg.add_table_column(width=25, width_stretch=True)
+                # dpg.add_table_column(width=25, width_stretch=True)
+                for i in range(len(self.results)):
+                    with dpg.table_row():
+                        dpg.add_text(self.results[i].primary_param)    # primary param
+                        dpg.add_text(self.results[i].correctness)    # correctness
+                        dpg.add_text(self.results[i].time_diff)    # time
+
 
 @contextmanager
 def parent(parent_id):
@@ -230,6 +244,18 @@ def translate_key(key_pressed):
     else:
         debugger(f'unknown key pressed: {key_pressed}')
         return None
+
+
+def temp(sender, app_data, user_data):
+    debugger(f'Temp sent {user_data}')
+    # config = user_data['configs'][config]
+
+def dirwalk(path):
+    for p in Path(path).iterdir():
+        if p.is_dir():
+            yield from dirwalk(p)
+            continue
+        yield p.resolve()
 
 
 if __name__ == '__main__':
