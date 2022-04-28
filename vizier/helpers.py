@@ -10,8 +10,24 @@ from collections import namedtuple
 from pathlib import Path
 import json
 
+@dataclass
+class Answers():
+    def __init__(self):
+        self.answers = []
+
+    def add(self, new_answer):
+        self.answers.append(new_answer)
+
+    def reset(self):
+        self.answers = []
+
 class DrawQueue():
-    """Queue, show and delete draw_nodes."""
+    """Queue, show and delete draw_nodes.
+
+    The queue must be fed a tuple containing at least a string referring to a dpg draw_node tag.
+    Optionally the tuple can contain a 'display_time_secs' attribute. This will be used to
+    hide the indicated dpg draw_node after a give amount of seconds.
+    """
     def __init__(self):
         self.queue = []
         self.current_item = ''

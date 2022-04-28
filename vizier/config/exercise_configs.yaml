@@ -1,0 +1,77 @@
+---
+Exercises:
+  Divergence:
+    Type: anaglyph
+    Configurations:
+      Entry:
+          Session:
+            step: 2
+            duration_secs: 90
+            count: 100
+      Regular:
+          Session:
+            step: 4
+            duration_secs: 90
+            count: 100
+      Advanced:
+          Session:
+            step: 6
+            duration_secs: 90
+            count: 100
+  Convergence:
+    Type: anaglyph
+    Configurations:
+      Entry:
+          Session:
+            step: -2
+            duration_secs: 90
+            count: 100
+      Regular:
+          Session:
+            step: -4
+            duration_secs: 90
+            count: 100
+      Advanced:
+            Session:
+              step: -6
+              duration_secs: 90
+            count: 100
+  Recognition:
+    Type: recognition
+    Configurations:
+      Entry:
+          Session:
+            step: 0
+            duration_secs: 90
+            count: 50
+            display_time: 0.7
+          Exercise:
+            object_size: 3
+            object_count: 3
+      Regular:
+          Session:
+            step: 0
+            duration_secs: 90
+            count: 50
+            display_time: 0.5
+          Exercise:
+            object_size: 3
+            object_count: 3
+      Advanced:
+          Session:
+            step 0:
+            duration_secs: 90
+            count: 50
+            display_time: 0.4
+          Exercise:
+            object_size: 2
+            object_count: 4
+      Expert:
+          Session:
+            step: 0
+            duration_secs: 90
+            count: 50
+            display_time: 0.3
+          Exercise:
+            object_size: 2
+            object_count: 4

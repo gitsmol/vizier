@@ -2,6 +2,8 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 from collections import namedtuple
 from . import helpers
+from . import imagemap
+from time import sleep
 
 """Module providing visual therapy exercises as classes."""
 COLORS = {
@@ -31,9 +33,9 @@ class Anaglyph():
     :param focal_size_rel: Relative size of the focal point as fraction of 1.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, drawlist, **kwargs):
         self.node_uuid = dpg.generate_uuid()
-        self.drawlist_uuid = kwargs.get('drawlist_uuid', 'draw_exercise')
+        self.drawlist_uuid = drawlist
         self.bg_offset = kwargs.get('bg_offset', 0)
         self.focal_offset = kwargs.get('focal_offset', 2)
         self.size = kwargs.get('size', dpg.get_value('anaglyph_size'))
@@ -169,46 +171,50 @@ class Recognition():
     :param object_type
     :param object_count
     :param object_size
-    :param build_time_secs
+    :param display_delay_secs: delay between drawing each object in secs
     :param display_time_secs
     :param drawlist_uuid: uuid of the drawlist to draw on
 
     """
-    def __init__(self, **kwargs):
+    def __init__(self, drawlist, **kwargs):
         self.object_type = kwargs.get('object_type', 'arrow')
         self.object_count = kwargs.get('object_count', 3)
         self.object_rel_size = kwargs.get('object_size', 5)
-        self.build_time_secs = kwargs.get('build_time_secs', 0.4)
+        self.display_delay_secs = kwargs.get('display_delay_secs', 0.3)
         self.display_time_secs = kwargs.get('delay', 0.7)
-        self.drawlist_uuid = kwargs.get('drawlist_uuid', None)
+        self.drawlist_uuid = drawlist
         self.drawlist_width = dpg.get_item_width(self.drawlist_uuid)
+        self.drawlist_height = dpg.get_item_height(self.drawlist_uuid)
+        self.answers_node_uuid = dpg.generate_uuid()
         self.object_size = self.object_rel_size / 100 * self.drawlist_width
+        self.object_margin = self.object_size * 0.15
         self.rng = np.random.default_rng()
 
     def draw(self):
         """Draw sequence of objects in hidden state. Return drawnode uuid."""
-        object_margin = self.object_size * 0.15
-        min_x = (self.drawlist_width / 2) - (self.object_count * (self.object_size + object_margin) / 2)
+        x_min = (self.drawlist_width / 2) - (self.object_count * (self.object_size + self.object_margin) / 2)
+        y = (self.drawlist_height / 2) - (self.object_size / 2)
         rng = np.random.default_rng()
         node_uuid = str(dpg.generate_uuid())
         arrow_direction = rng.choice(['top', 'bottom', 'left', 'right'])
-        arrows = {
-            'Up': 'ArrowUp.png',
-            'Down': 'ArrowDown.png',
-            'Left': 'ArrowLeft.png',
-            'Right': 'ArrowRight.png'
-        }
         directions = []
 
-        with dpg.draw_node(tag=node_uuid):
+        with dpg.draw_node(tag=node_uuid, parent=self.drawlist_uuid, show=True):
             for i in range(self.object_count):
-                random_direction = self.rng.choice(['Up', 'Down', 'Left', 'Right'])
-                x = min_x + (i * (self.object_size + object_margin))
-                helpers.debugger(x)
-                y = 100
-                dpg.draw_image(arrows.get(random_direction), pmin=(x, y), pmax=(x + self.object_size, y + self.object_size))
+                random_direction = self.rng.choice(['up', 'down', 'left', 'right'])
+                x = x_min + (i * (self.object_size + self.object_margin))
+                dpg.draw_image(imagemap.arrows.get(random_direction), pmin=(x, y), pmax=(x + self.object_size, y + self.object_size))
                 directions.append(random_direction)
+                sleep(self.display_delay_secs)
 
          # return a namedtuple for legibility in other places
         drawing = namedtuple('Drawing', ['node_uuid', 'directions', 'display_time_secs'])
         return drawing(node_uuid, directions, self.display_time_secs)
+
+    def draw_single(self, key, pos):
+        image = imagemap.arrows.get(key)
+        x_min = (self.drawlist_width / 2) - (self.object_count * (self.object_size + self.object_margin) / 2)
+        x = x_min + (pos * (self.object_size + self.object_margin))
+        y = (self.drawlist_height / 2) - (self.object_size / 2) + (self.object_size)
+        with dpg.draw_node(tag=self.answers_node_uuid, parent=self.drawlist_uuid):
+            dpg.draw_image(image, pmin=(x, y), pmax=(x + self.object_size, y + self.object_size))
