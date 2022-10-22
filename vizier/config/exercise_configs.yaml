@@ -1,25 +1,61 @@
 ---
 Exercises:
-  Divergence:
-    Type: anaglyph
+  Divergence (Large):
+    Plugin: vergence
     Configurations:
       Entry:
           Session:
             step: 2
             duration_secs: 90
             count: 100
+          Exercise:
+            size: 300
+            pixel_size: 3
       Regular:
           Session:
             step: 4
             duration_secs: 90
             count: 100
+          Exercise:
+            size: 300
+            pixel_size: 3
       Advanced:
           Session:
             step: 6
             duration_secs: 90
             count: 100
+          Exercise:
+            size: 300
+            pixel_size: 3
+  Divergence (Small):
+    Plugin: vergence
+    Configurations:
+      Entry:
+          Session:
+            step: 2
+            duration_secs: 90
+            count: 100
+          Exercise:
+            size: 150
+            pixel_size: 2
+      Regular:
+          Session:
+            step: 4
+            duration_secs: 90
+            count: 100
+          Exercise:
+            size: 150
+            pixel_size: 2
+      Advanced:
+          Session:
+            step: 6
+            duration_secs: 90
+            count: 100
+          Exercise:
+            size: 150
+            pixel_size: 2
   Convergence:
-    Type: anaglyph
+    Plugin: vergence
     Configurations:
       Entry:
           Session:
@@ -37,41 +73,99 @@ Exercises:
               duration_secs: 90
             count: 100
   Recognition:
-    Type: recognition
+    Plugin: recognition
     Configurations:
       Entry:
           Session:
             step: 0
             duration_secs: 90
             count: 50
-            display_time: 0.7
           Exercise:
             object_size: 3
             object_count: 3
+            display_time_secs: 0.7
       Regular:
           Session:
             step: 0
             duration_secs: 90
             count: 50
-            display_time: 0.5
           Exercise:
             object_size: 3
             object_count: 3
+            display_time_secs: 0.5
       Advanced:
           Session:
             step 0:
             duration_secs: 90
             count: 50
-            display_time: 0.4
           Exercise:
             object_size: 2
             object_count: 4
+            display_time_secs: 0.4
       Expert:
           Session:
             step: 0
             duration_secs: 90
             count: 50
-            display_time: 0.3
           Exercise:
             object_size: 2
             object_count: 4
+            display_time_secs: 0.3
+            display_delay_secs: 0.2
+  Alignment:
+    Plugin: alignment
+    Configurations:
+      Basic:
+        Session:
+          step: 0
+          duration_secs: 360
+          count: 1
+        Exercise:
+          object_size: 4
+      Duck hunt:
+        Session:
+          step: 0
+          duration_secs: 60
+          count: 10
+        Exercise:
+          object_size: 4
+          randomness: 75
+  'Depth perception':
+    Plugin: depth_perception
+    Configurations:
+      Test:
+          Session:
+            step: 0
+            duration_secs: 120
+            count: 5
+          Exercise:
+            object_count: 8
+            object_size: 10
+            min_depth: -30
+            max_depth: 30
+            min_depth_diff: 5  # lower bound of depth difference,
+            max_depth_diff: 10 # upper bound. both impact difficulty.
+      Basic:
+        Session:
+          step: 0
+          duration_secs: 60
+          count: 30
+        Exercise:
+          object_count: 5
+          object_size: 10
+          min_depth: -20
+          max_depth: 20
+          min_depth_diff: 10  # lower bound of depth difference,
+          max_depth_diff: 20 # upper bound. both impact difficulty.
+      Advanced:
+        Session:
+          step: 0
+          duration_secs: 60
+          count: 30
+        Exercise:
+          object_count: 5
+          object_size: 8
+          min_depth: -20
+          max_depth: 20
+          min_depth_diff: 5  # lower bound of depth difference,
+          max_depth_diff: 15 # upper bound. both impact difficulty.

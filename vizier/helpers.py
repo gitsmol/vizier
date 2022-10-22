@@ -1,22 +1,35 @@
 """Module containing helper functions for Vizier."""
-# this is only necessary to avoid circular imports.
 
 import dearpygui.dearpygui as dpg
 from contextlib import contextmanager
-from dataclasses import dataclass
-from time import time, time_ns, sleep
+from time import time, sleep
 from threading import Thread
 from collections import namedtuple
 from pathlib import Path
-import json
+import importlib
+import pkgutil
+import yaml
+import logging
+from vizier.theme import COLORS, SAFE_COLORS_TOL, SAFE_COLORS_WONG
+from vizier import profile
 
-@dataclass
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
+fixed_window = {'no_title_bar': True, 'menubar': False, 'no_resize': True, 'no_move': True}
+
 class Answers():
+    """Keeps a temporary record of given answers. This is useful in cases when a series of answers needs to be evaluated by the evaluation logic. For instance, when showing multiple arrows that need to be recalled in the correct order."""
+
     def __init__(self):
         self.answers = []
+        self.accept_input = True
 
     def add(self, new_answer):
-        self.answers.append(new_answer)
+        if self.accept_input:
+            self.answers.append(new_answer)
+
+    def replace(self, new_answer):
+        if self.accept_input:
+            self.answers = [new_answer]
 
     def reset(self):
         self.answers = []
@@ -30,11 +43,20 @@ class DrawQueue():
     """
     def __init__(self):
         self.queue = []
-        self.current_item = ''
+        self.current_item = None
+
+    def __repr__(self):
+        summary = f'Queued: {self.queue}\nCurrent item: {self.current_item}'
+        return summary
 
     def add(self, item_tuple):
         """Add a tag for a dpg item to the queue."""
         self.queue.append(item_tuple)
+
+    def remove(self):
+        """Remove current dpg item from the queue."""
+        dpg.delete_item(self.current_item.node_uuid)
+        self.current_item = None
 
     def next(self):
         """Unhides current node, deletes previous node."""
@@ -52,7 +74,7 @@ class DrawQueue():
     def display_timer(self, node_uuid, secs):
         sleep(secs)
         dpg.hide_item(node_uuid)
-
+    
 
 class EvaluationSession():
     """Stores evaluation context variables, parameters and results.
@@ -67,18 +89,18 @@ class EvaluationSession():
     :func add_result(tuple): adds a tuple containing an evaluation result to the session results.
     :func end(): stops the evaluation and displays the results.
     """
-    def __init__(self, window_tag=None, **kwargs):
+    def __init__(self, window_tag=None, **session_config):
         self.window = window_tag
         self.win_uuid = dpg.generate_uuid()
         self.handler_uuid = dpg.generate_uuid()
         self.drawlist_uuid = dpg.generate_uuid()
-        self.primary_param_init = kwargs.get('primary_param_init', 0)
+        self.primary_param_init = session_config.get('primary_param_init', 0)
         self.primary_param = self.primary_param_init
-        self.step = kwargs.get('step', 1)
-        self.success_threshold = kwargs.get('success_threshold', 2)
-        self.fail_threshold = kwargs.get('fail_threshold', 2)
-        self.count = kwargs.get('count', 50)
-        self.duration_secs = kwargs.get('duration_secs', 120)
+        self.step = session_config.get('step', 1)
+        self.success_threshold = session_config.get('success_threshold', 2)
+        self.fail_threshold = session_config.get('fail_threshold', 2)
+        self.count = session_config.get('count', 50)
+        self.duration_secs = session_config.get('duration_secs', 120)
         self.epoch_start = time()
         self.results = []
         self.fail = 0
@@ -89,6 +111,7 @@ class EvaluationSession():
         self.Result = namedtuple('Result', ['count', 'primary_param', 'correctness', 'time', 'time_diff'])
 
     def dataframe(self) -> int:
+        raise NotImplemented()
         df = pd.DataFrame(self.results, columns=['Count', 'Answer', 'Epoch', 'Diff_sec'])
         return df
 
@@ -136,28 +159,70 @@ class EvaluationSession():
             self.end()
 
     def end(self):
-        """Ends the evaluation session. Destroys IO handler and window. Stops _countdown thread. Creates results window."""
+        """Ends the evaluation session. Destroys IO handler and window. Stops _countdown() thread. Creates results window."""
         debugger('Stopping evaluation.')
         self.active = False
         dpg.delete_item(self.handler_uuid)
         dpg.delete_item(self.win_uuid)
-        self.show_results()
+        eval_results(self.results)
 
-    def show_results(self):
-        with dpg.window(pos=[100, 200], width=400, height=500):
-            dpg.add_text('Finished!')
+def eval_results(results):
+    count = []
+    param = []
+    correct = []
+    time_diff = []
+
+    for i, val in enumerate(results):
+        count.append(i)
+        param.append(val.primary_param)
+        correct.append(val.correctness)
+        time_diff.append(val.time_diff)
+
+    count_true = correct.count(True)
+    count_false = correct.count(False)
+
+    with dpg.window(width=800, height=600, modal=True):
+        with dpg.table():
+            dpg.add_table_column(width_fixed=True)
+            dpg.add_table_column(width_stretch=True)
+            with dpg.table_row():
+                with dpg.plot(label="Score", height=250, width=250):
+                    # optionally create legend
+                    dpg.add_plot_legend()
+
+                    # REQUIRED: create x and y axes
+                    dpg.add_plot_axis(dpg.mvXAxis, label="", no_gridlines=True, no_tick_marks=True, no_tick_labels=True)
+                    dpg.set_axis_limits(dpg.last_item(), 0, 1)
+
+                    # create y axis
+                    with dpg.plot_axis(dpg.mvYAxis, label="", no_gridlines=True, no_tick_marks=True, no_tick_labels=True):
+                        dpg.set_axis_limits(dpg.last_item(), 0, 1)
+                        # dpg.add_pie_series(0.5, 0.5, 0.5, [0.25, 0.30, 0.30], ["fish", "cow", "chicken"])
+                        dpg.add_pie_series(0.5, 0.5, 0.5, values=[count_true, count_false], labels=['True', 'False'])
+
+                with dpg.plot(label="Development", height=250, width=550):
+                    y_score = dpg.generate_uuid()
+                    y_difficulty = dpg.generate_uuid()
+                    y_time_diff = dpg.generate_uuid()
+                    dpg.add_plot_legend()
+
+                    dpg.add_plot_axis(dpg.mvXAxis, label="Tries")
+                    dpg.add_plot_axis(dpg.mvYAxis, label="Score", tag=y_score)
+                    dpg.add_plot_axis(dpg.mvYAxis, label="Difficulty", tag=y_difficulty)
+                    dpg.add_plot_axis(dpg.mvYAxis, label="Timing", tag=y_time_diff)
+
+                    dpg.add_bar_series(count, correct, label="Correct", parent=y_score)
+                    dpg.add_line_series(count, param, label="Param", parent=y_difficulty)
+                    dpg.add_line_series(count, time_diff, label="Time", parent=y_time_diff)
+
+        with dpg.collapsing_header(label='Results'):
             with dpg.table(resizable=False, policy=4, scrollY=False, header_row=True):
-                for item in self.results[0]:
-                    dpg.add_table_column(width=25, width_stretch=True, label='Label')
-                    # dpg.add_table_column(width=25, width_stretch=True)
-                # dpg.add_table_column(width=25, width_stretch=True)
-                # dpg.add_table_column(width=25, width_stretch=True)
-                # dpg.add_table_column(width=25, width_stretch=True)
-                for i in range(len(self.results)):
+                for field in results[0]._fields:
+                    dpg.add_table_column(width=25, width_stretch=True, label=field)
+                for i in range(len(results)):
                     with dpg.table_row():
-                        dpg.add_text(self.results[i].primary_param)    # primary param
-                        dpg.add_text(self.results[i].correctness)    # correctness
-                        dpg.add_text(self.results[i].time_diff)    # time
+                        for field in results[0]._fields:
+                            dpg.add_text(getattr(results[i], field))   # primary param
 
 
 @contextmanager
@@ -185,55 +250,66 @@ def calibrate():
             dpg.set_value('color_right', left)
             redraw()
 
+    def profile_save():
+        if profile.SESSION.username:
+
+            debugger('We can totally keep some configs in the sqlite db.')
+
     # TODO replace 'if exist show-pattern' with helper function
-    if  dpg.does_item_exist('win_calibrate') == True:
-        dpg.show_item('win_calibrate')
-    if  dpg.does_item_exist('win_calibrate') == False:
-        with dpg.window(tag='win_calibrate', pos=[200,50], width=500, height=500, modal=True):
+    with dpg.window(tag='win_calibrate', pos=[200,50], width=500, height=500, modal=True, on_close=delete):
 
-            # calibration window gets its own theme
-            with dpg.theme() as theme_calibrate:
-                with dpg.theme_component(dpg.mvAll):
-                    dpg.add_theme_color(dpg.mvThemeCol_PopupBg, (0, 0, 0), category=dpg.mvThemeCat_Core)
-                    dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 1, category=dpg.mvThemeCat_Core)
-            dpg.bind_item_theme('win_calibrate', theme_calibrate)
+        # calibration window gets its own theme
+        with dpg.theme() as theme_calibrate:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_PopupBg, (0, 0, 0), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 1, category=dpg.mvThemeCat_Core)
+        dpg.bind_item_theme('win_calibrate', theme_calibrate)
 
-            dpg.add_button(tag='btn_swap_eyes', label='Swap left/right', callback=swap_eyes)
-            with dpg.table(resizable=True, policy=4, scrollY=False, header_row=False):
-                dpg.add_table_column()
-                dpg.add_table_column()
-                with dpg.table_row():
-                    dpg.add_color_picker(label='Left eye', source='color_left', alpha_bar=True, no_inputs=True, callback=redraw)
-                    dpg.add_color_picker(label='Right eye', source='color_right', alpha_bar=True, no_inputs=True, callback=redraw)
-            with dpg.drawlist(tag='draw_calibrate', width=300, height=200):
-                dpg.draw_quad((0, 50), (50, 100), (100, 50), (50, 0), fill=dpg.get_value('color_left'), color=dpg.get_value('color_left'), thickness=0, parent='draw_calibrate')
-                dpg.draw_quad((50, 50), (100, 100), (150, 50), (100, 0), fill=dpg.get_value('color_right'), color=dpg.get_value('color_right'), thickness=0, parent='draw_calibrate')
+        dpg.add_button(tag='btn_swap_eyes', label='Swap left/right', callback=swap_eyes)
+        with dpg.table(resizable=True, policy=4, scrollY=False, header_row=False):
+            dpg.add_table_column()
+            dpg.add_table_column()
+            with dpg.table_row():
+                dpg.add_color_picker(label='Left eye', source='color_left', alpha_bar=True, no_inputs=True, callback=redraw)
+                dpg.add_color_picker(label='Right eye', source='color_right', alpha_bar=True, no_inputs=True, callback=redraw)
+        with dpg.drawlist(tag='draw_calibrate', width=300, height=200):
+            dpg.draw_quad((0, 50), (50, 100), (100, 50), (50, 0), fill=dpg.get_value('color_left'), color=dpg.get_value('color_left'), thickness=0, parent='draw_calibrate')
+            dpg.draw_quad((50, 50), (100, 100), (150, 50), (100, 0), fill=dpg.get_value('color_right'), color=dpg.get_value('color_right'), thickness=0, parent='draw_calibrate')
+
+        dpg.add_button(label='Save and close', callback=profile_save)
 
 def debugger(debug_data, level='info'):
-    """Sends data to the debugging window."""
+    """Sends data to the debugging window and the debug logger."""
+    logging.debug(debug_data)
     if dpg.get_value('bool_debug') == True:
         old_data = dpg.get_value('txt_debug')
         dpg.set_value('txt_debug', f'{debug_data}\n{old_data}')
 
-def resizer():
-    """Resizes and repositions items whenever the viewport is resized."""
-    viewport_width = dpg.get_viewport_width()
-    viewport_height = dpg.get_viewport_height()
+def delete(sender, app_data):
+    dpg.delete_item(sender)
 
-    def center(item, rel_y='none'):
+def center(item, rel_y=None):
+        """Center given dpg item."""
+        viewport_width = dpg.get_viewport_width()
+        viewport_height = dpg.get_viewport_height()
         item_width = dpg.get_item_width(item)
         item_height = dpg.get_item_height(item)
 
         rel_y_positions = {
             'top' : 0,
             'bottom' : dpg.get_viewport_height() - item_height,
-            'none' : dpg.get_item_pos(item)[1]
+            None : dpg.get_item_pos(item)[1]
         }
 
         newpos_x = viewport_width / 2 - item_width / 2
         newpos_y = rel_y_positions[rel_y]
         debugger(f'setting pos [{newpos_x, newpos_y}] for {item}')
         dpg.set_item_pos(item, [newpos_x, newpos_y])
+
+def resizer():
+    """Resizes and repositions items whenever the viewport is resized."""
+    viewport_width = dpg.get_viewport_width()
+    viewport_height = dpg.get_viewport_height()
 
     def fullscreen(item):
         dpg.set_item_width(item, viewport_width)
@@ -261,6 +337,11 @@ def translate_key(key_pressed):
         debugger(f'unknown key pressed: {key_pressed}')
         return None
 
+def anaglyph_config():
+    with dpg.window(tag='configure', width=350, pos=(100,100)):
+        dpg.add_slider_int(label='Size', source='anaglyph_size', min_value=100, max_value=400)
+        dpg.add_slider_int(label='Pixel size', source='anaglyph_pixel_size', min_value=1, max_value=10)
+        dpg.add_slider_float(label='Focal point size', source='anaglyph_focal_size', min_value=0.1, max_value=0.5)
 
 def temp(sender, app_data, user_data):
     debugger(f'Temp sent {user_data}')
@@ -273,6 +354,29 @@ def dirwalk(path):
             continue
         yield p.resolve()
 
+def error(exc, debug_info=''):
+    win_id = dpg.generate_uuid()
+    with dpg.window(tag=win_id, modal=True, no_resize=True, width=300):
+        center(win_id, rel_y='top')
+        dpg.add_text(debug_info)
+        dpg.add_text(exc)
+
+def import_submodules(package, recursive=True):
+    """ Import all submodules of a module, recursively, including subpackages
+
+    :param package: package (name or actual module)
+    :type package: str | module
+    :rtype: dict[str, types.ModuleType]
+    """
+    if isinstance(package, str):
+        package = importlib.import_module(package)
+    results = {}
+    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
+        full_name = package.__name__ + '.' + name
+        results[full_name] = importlib.import_module(full_name)
+        if recursive and is_pkg:
+            results.update(import_submodules(full_name))
+    return results
 
 if __name__ == '__main__':
     print('Only to be used as part of the Vizier application.')

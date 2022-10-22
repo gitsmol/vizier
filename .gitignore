@@ -3,6 +3,8 @@ testdata/
 *.sgf
 *.xlsx
 *.sqlite
+
+# no temp files
 temp/
 
 # mac stuff
