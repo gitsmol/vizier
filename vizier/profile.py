@@ -2,12 +2,12 @@ import peewee as pw
 import dearpygui.dearpygui as dpg
 import yaml
 from pathlib import Path
-from vizier import helpers
-from vizier.profile_datamodel import ActiveProfile
-from vizier.profile_datamodel import User
-from vizier.profile_datamodel import CalibrationData
-from vizier.profile_datamodel import BaseModel
-from vizier.profile_datamodel import Result
+from . import helpers
+from .profile_datamodel import ActiveProfile
+from .profile_datamodel import User
+from .profile_datamodel import CalibrationData
+from .profile_datamodel import BaseModel
+from .profile_datamodel import Result
 
 with open("./vizier/config/config.yaml") as config_file:
     config = yaml.safe_load(config_file)

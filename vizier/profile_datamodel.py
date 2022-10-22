@@ -2,7 +2,6 @@ import peewee as pw
 import yaml
 from datetime import datetime
 from pathlib import Path
-from vizier import helpers
 
 with open("./vizier/config/config.yaml") as config_file:
     config = yaml.safe_load(config_file)
@@ -27,16 +26,13 @@ class ActiveProfile():
 
     def db_safe_init(self):
         """Explicitly open the database, create tables and close. Initalizes missing tables."""
-        if not Path(db_path):
-            helpers.debugger(f'No database found at {db_path}.\nInitalizating new sqlite3 database.')
-
         tables = [User(), CalibrationData(), Result()]
         db.connect()
         db.create_tables(tables)
         db.close()
 
     def __repr__(self):
-        return f'{self.display_name} ({self.username})'
+        return f'{self.display_name} ({self.usernam })'
 
 # Database model and classes representing tables
 class BaseModel(pw.Model):
@@ -66,4 +62,3 @@ class Result(BaseModel):
     correctness = pw.BooleanField()
     time = pw.FloatField()
     time_diff = pw.FloatField()
-

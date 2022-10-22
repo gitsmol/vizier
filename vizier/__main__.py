@@ -1,12 +1,12 @@
 import dearpygui.dearpygui as dpg
 import yaml
-from vizier import helpers
-from vizier import launcher
-from vizier import theme
-from vizier import profile
-from vizier import configbuilder
-from vizier.profile_datamodel import ActiveProfile
-from vizier.theme import COLORS
+from . import helpers
+from . import launcher
+from . import theme
+from . import profile
+from . import configbuilder
+from .profile_datamodel import ActiveProfile
+from .theme import COLORS
 
 dpg.create_context()
 

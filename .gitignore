@@ -3,6 +3,7 @@ testdata/
 *.sgf
 *.xlsx
 *.sqlite
+*.db
 
 # no temp files
 temp/

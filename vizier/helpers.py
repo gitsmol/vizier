@@ -10,8 +10,8 @@ import importlib
 import pkgutil
 import yaml
 import logging
-from vizier.theme import COLORS, SAFE_COLORS_TOL, SAFE_COLORS_WONG
-from vizier import profile
+from .theme import COLORS, SAFE_COLORS_TOL, SAFE_COLORS_WONG
+from . import profile
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 fixed_window = {'no_title_bar': True, 'menubar': False, 'no_resize': True, 'no_move': True}
@@ -252,6 +252,7 @@ def calibrate():
 
     def profile_save():
         if profile.SESSION.username:
+            profile.CalibrationData(left_color=dpg.get_value('color_left'))
 
             debugger('We can totally keep some configs in the sqlite db.')
 

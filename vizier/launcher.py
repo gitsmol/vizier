@@ -1,9 +1,9 @@
 """Module containing evaluation programs for various exercises."""
 import dearpygui.dearpygui as dpg
 import yaml
-from vizier import helpers
-from vizier import profile
-from vizier.exercises import * # NOTE yes frowned upon but programmatic ways dont work?
+from . import helpers
+from . import profile
+from .exercises import * # NOTE yes frowned upon but programmatic ways dont work?
 
 def generic(sender, app_data, user_data=''):
     if sender == 'btn_close':
