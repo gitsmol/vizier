@@ -1,8 +1,8 @@
 import dearpygui.dearpygui as dpg
 import numpy as np
 from collections import namedtuple
-from vizier import helpers
-from vizier import imagemap
+from ..modules import helpers
+from ..modules import imagemap
 from time import sleep
 
 """

@@ -2,8 +2,8 @@ import numpy as np
 import dearpygui.dearpygui as dpg
 from collections import namedtuple
 from time import sleep
-from vizier import helpers
-from vizier import imagemap
+from ..modules import helpers
+from ..modules import imagemap
 
 class Recognition():
     """Game where subject sees a number of objects and has to reproduce them

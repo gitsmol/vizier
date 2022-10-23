@@ -1,7 +1,7 @@
 import numpy as np
 import dearpygui.dearpygui as dpg
 from collections import namedtuple
-import vizier.helpers as helpers
+from ..modules import helpers
 
 class Alignment():
     def __init__(self, drawlist, **kwargs):

@@ -1,12 +1,12 @@
 import dearpygui.dearpygui as dpg
 import yaml
-from . import helpers
-from . import launcher
-from . import theme
-from . import profile
-from . import settings
-from .profile_datamodel import ActiveProfile
-from .theme import COLORS
+from .modules import helpers
+from .modules import launcher
+from .modules import theme
+from .modules import profile
+from .modules import settings
+from .modules.profile_datamodel import ActiveProfile
+from .modules.theme import COLORS
 
 dpg.create_context()
 

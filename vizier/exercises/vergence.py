@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
 import numpy as np
 from collections import namedtuple
-from vizier import helpers
+from ..modules import helpers
 
 ar_down = np.array([
     [0, 0, 0, 1, 1, 1, 0, 0, 0],
