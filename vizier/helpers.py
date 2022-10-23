@@ -235,50 +235,6 @@ def parent(parent_id):
     finally:
         dpg.pop_container_stack()
 
-def calibrate():
-    """Creates a window to calibrate the colors for the anaglyph exercise. Takes no arguments.
-    Sets 'color_left' and 'color_right' in the DPG value registry."""
-    def redraw():
-            dpg.delete_item('draw_calibrate', children_only=True)
-            dpg.draw_quad((0, 50), (50, 100), (100, 50), (50, 0), fill=dpg.get_value('color_left'), color=dpg.get_value('color_left'), thickness=0, parent='draw_calibrate')
-            dpg.draw_quad((50, 50), (100, 100), (150, 50), (100, 0), fill=dpg.get_value('color_right'), color=dpg.get_value('color_right'), thickness=0, parent='draw_calibrate')
-
-    def swap_eyes():
-            left = dpg.get_value('color_left')
-            right = dpg.get_value('color_right')
-            dpg.set_value('color_left', right)
-            dpg.set_value('color_right', left)
-            redraw()
-
-    def profile_save():
-        if profile.SESSION.username:
-            profile.CalibrationData(left_color=dpg.get_value('color_left'))
-
-            debugger('We can totally keep some configs in the sqlite db.')
-
-    # TODO replace 'if exist show-pattern' with helper function
-    with dpg.window(tag='win_calibrate', pos=[200,50], width=500, height=500, modal=True, on_close=delete):
-
-        # calibration window gets its own theme
-        with dpg.theme() as theme_calibrate:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_color(dpg.mvThemeCol_PopupBg, (0, 0, 0), category=dpg.mvThemeCat_Core)
-                dpg.add_theme_style(dpg.mvStyleVar_FrameRounding, 1, category=dpg.mvThemeCat_Core)
-        dpg.bind_item_theme('win_calibrate', theme_calibrate)
-
-        dpg.add_button(tag='btn_swap_eyes', label='Swap left/right', callback=swap_eyes)
-        with dpg.table(resizable=True, policy=4, scrollY=False, header_row=False):
-            dpg.add_table_column()
-            dpg.add_table_column()
-            with dpg.table_row():
-                dpg.add_color_picker(label='Left eye', source='color_left', alpha_bar=True, no_inputs=True, callback=redraw)
-                dpg.add_color_picker(label='Right eye', source='color_right', alpha_bar=True, no_inputs=True, callback=redraw)
-        with dpg.drawlist(tag='draw_calibrate', width=300, height=200):
-            dpg.draw_quad((0, 50), (50, 100), (100, 50), (50, 0), fill=dpg.get_value('color_left'), color=dpg.get_value('color_left'), thickness=0, parent='draw_calibrate')
-            dpg.draw_quad((50, 50), (100, 100), (150, 50), (100, 0), fill=dpg.get_value('color_right'), color=dpg.get_value('color_right'), thickness=0, parent='draw_calibrate')
-
-        dpg.add_button(label='Save and close', callback=profile_save)
-
 def debugger(debug_data, level='info'):
     """Sends data to the debugging window and the debug logger."""
     logging.debug(debug_data)
@@ -335,18 +291,22 @@ def translate_key(key_pressed):
     if key_pressed in keys:
         return keys.get(key_pressed)
     else:
-        debugger(f'unknown key pressed: {key_pressed}')
+        # debugger(f'unknown key pressed: {key_pressed}')
         return None
 
-def anaglyph_config():
-    with dpg.window(tag='configure', width=350, pos=(100,100)):
-        dpg.add_slider_int(label='Size', source='anaglyph_size', min_value=100, max_value=400)
-        dpg.add_slider_int(label='Pixel size', source='anaglyph_pixel_size', min_value=1, max_value=10)
-        dpg.add_slider_float(label='Focal point size', source='anaglyph_focal_size', min_value=0.1, max_value=0.5)
+def value_registry():
+    def refresh():
+        dpg.delete_item('win_value_registry')
+        value_registry()
 
-def temp(sender, app_data, user_data):
-    debugger(f'Temp sent {user_data}')
-    # config = user_data['configs'][config]
+    with dpg.window(tag='win_value_registry', width=300, height=300, on_close=delete):
+        color_left = dpg.get_value('color_left')
+        color_right = dpg.get_value('color_right')
+
+        dpg.add_button(label='Refresh', callback=refresh)
+        dpg.add_text(color_left, label='color_left')
+        dpg.add_text(color_right, label='color_right')
+
 
 def dirwalk(path):
     for p in Path(path).iterdir():

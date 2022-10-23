@@ -2,6 +2,7 @@ import peewee as pw
 import yaml
 from datetime import datetime
 from pathlib import Path
+from dataclasses import dataclass
 
 with open("./vizier/config/config.yaml") as config_file:
     config = yaml.safe_load(config_file)
@@ -9,6 +10,13 @@ with open("./vizier/config/config.yaml") as config_file:
 db_path = config["application"]["profile_db_path"]
 db = pw.SqliteDatabase(db_path)
 
+# dataclass for anaglyph glasses color calibration data
+@dataclass
+class Calibration():
+    color_left: tuple = (0)
+    color_right: tuple = (0)
+
+# Database model and classes representing tables
 class ActiveProfile():
     def __call__(self, *args, **kwargs):
         """This is a singleton."""
@@ -17,12 +25,23 @@ class ActiveProfile():
         return self.instance
 
     def __init__(self):
-        self.username = None
+        self.user = False
+        self.calibration_data = CalibrationData()
         self.db_safe_init()
 
-    def activate(self, username, display_name=""):
-        self.display_name = display_name
-        self.username = username
+    def activate(self, username):
+        """Fetch data from the database and store it in the session."""
+        def _to_tuple(x):
+            """Unfortunately sqlite saves our tuples as a string.
+            We have to convert this string back to a tuple."""
+            return tuple(map(float, x[1:-1].split(',')))
+
+        with db:
+            self.user = User.get(User.username == username)
+            self.calibration_data = CalibrationData.get(CalibrationData.user == self.user.id)
+            # if calibdata:
+                # self.calibration.color_left = _to_tuple(calibdata.color_left)
+                # self.calibration.color_right = _to_tuple(calibdata.color_right)
 
     def db_safe_init(self):
         """Explicitly open the database, create tables and close. Initalizes missing tables."""
@@ -32,9 +51,11 @@ class ActiveProfile():
         db.close()
 
     def __repr__(self):
-        return f'{self.display_name} ({self.usernam })'
+        if self.user:
+            return f'[{self.user.id}] {self.user.first_name} {self.user.last_name} ({self.user.username})'
+        else:
+            return f'No user activated.'
 
-# Database model and classes representing tables
 class BaseModel(pw.Model):
     class Meta:
         database = db
@@ -47,7 +68,7 @@ class User(BaseModel):
 
 class CalibrationData(BaseModel):
     id = pw.IntegerField(unique=True, primary_key=True)
-    user = pw.ForeignKeyField(User, backref="calibration")
+    user = pw.ForeignKeyField(User, backref="calibration", unique=True)
     color_left = pw.CharField()
     color_right = pw.CharField()
 

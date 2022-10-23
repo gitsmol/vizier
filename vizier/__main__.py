@@ -4,7 +4,7 @@ from . import helpers
 from . import launcher
 from . import theme
 from . import profile
-from . import configbuilder
+from . import settings
 from .profile_datamodel import ActiveProfile
 from .theme import COLORS
 
@@ -60,10 +60,11 @@ with dpg.window(tag='primary_window'):
                 dpg.add_button(tag='btn_evaluate', label='Exercises', callback=launcher.evaluations, width=200)
             with dpg.table_row():
                 dpg.add_table_cell()
-                dpg.add_button(tag='btn_edit_config', label='Configuration', callback=configbuilder.edit_config, width=200)
+                dpg.add_button(tag='btn_edit_config', label='Configuration', callback=settings.edit_config, width=200)
             with dpg.table_row():
                 dpg.add_table_cell()
-                dpg.add_button(tag='btn_calibrate', label='Calibrate', callback=helpers.calibrate, width=200)
+                dpg.add_button(tag='btn_calibrate', label='Calibrate', callback=settings.calibrate, width=200)
+
             if config['application']['debug'] == True:
                 with dpg.table_row():
                     dpg.add_table_cell()
@@ -71,9 +72,12 @@ with dpg.window(tag='primary_window'):
                 with dpg.table_row():
                     dpg.add_table_cell()
                     dpg.add_button(tag='btn_font_manager', label='Font manager', callback=dpg.show_font_manager, width=200)
-                with dpg.table_row(height=100):
+                with dpg.table_row():
                     dpg.add_table_cell()
                     dpg.add_button(tag='btn_item_registry', label='Item registry', callback=dpg.show_item_registry, width=200)
+                with dpg.table_row(height=100):
+                    dpg.add_table_cell()
+                    dpg.add_button(tag='btn_value_registry', label='Value registry', callback=helpers.value_registry, width=200)
             with dpg.table_row():
                 dpg.add_table_cell()
                 dpg.add_button(tag='btn_quit', label='Quit', callback=dpg.stop_dearpygui, width=200)
@@ -89,6 +93,7 @@ if config['application']['debug'] == True:
         dpg.add_text(source='txt_debug', wrap=280)
 
 theme.initialize()
+
 
 # DPG context etc
 dpg.create_viewport(title='Vizier', width=1000, height=700)
