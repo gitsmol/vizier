@@ -1,7 +1,10 @@
 # Vizier
 Vizier provides a number of visual therapy exercises in a standalone application. It is written in Python and uses the DearPyGui library for its graphics.
 
-## Layout
+## Running
+Vizier is to be run as a module. Git clone the repo and run 'python -m vizier' from the root directory.
+
+## Code layout
 The application consists of several parts:
 
 1. The main interface (__main__)
