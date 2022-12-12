@@ -1,6 +1,6 @@
 application:
   NOTIMP_exercise_config_path: ./vizier/config/exercise_config.yaml
-  debug: true
+  debug: false
   hidpi: true
   image_path: ./vizier/assets/images/
   profile_db_path: ./vizier/userdata/profiles.db

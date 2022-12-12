@@ -4,6 +4,7 @@ testdata/
 *.xlsx
 *.sqlite
 *.db
+*.org
 
 # no temp files
 temp/

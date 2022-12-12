@@ -3,24 +3,12 @@ import numpy as np
 from collections import namedtuple
 from ..modules import helpers
 
-ar_down = np.array([
-    [0, 0, 0, 1, 1, 1, 0, 0, 0],
-    [0, 0, 0, 1, 1, 1, 0, 0, 0],
-    [0, 0, 0, 1, 1, 1, 0, 0, 0],
-    [0, 0, 0, 1, 1, 1, 0, 0, 0],
-    [0, 0, 0, 1, 1, 1, 0, 0, 0],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [0, 1, 1, 1, 1, 1, 1, 1, 0],
-    [0, 0, 1, 1, 1, 1, 1, 0, 0],
-    [0, 0, 0, 1, 1, 1, 0, 0, 0],
-    [0, 0, 0, 0, 1, 0, 0, 0, 0]
-])
-
 class Anaglyph:
     """
     Class to create anaglyph images. Each image consists of a background and a focal point.
     draw() draws both focal point and background in order, according to the kwargs defined in __init__.
 
+    :param drawlist: the DPG parent to draw into.
     :param bg_offset: Define drawing offset on x-axis for the background image.
     :param focal_offset: Define drawing offset on x-axis for the focal image.
     :param size: Size of one side of the image in pixels. Used for x and y size.
